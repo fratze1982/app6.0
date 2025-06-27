@@ -7,10 +7,10 @@ from sklearn.inspection import PartialDependenceDisplay
 import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="KI-Vorhersage für Lackrezepturen", layout="wide")
-st.title("🎨 KI-Vorhersage für Lackrezepturen")
+st.title("\U0001F3A8 KI-Vorhersage für Lackrezepturen")
 
 # --- Datei-Upload ---
-uploaded_file = st.file_uploader("📁 CSV-Datei hochladen (mit ; getrennt)", type=["csv"])
+uploaded_file = st.file_uploader("\U0001F4C1 CSV-Datei hochladen (mit ; getrennt)", type=["csv"])
 if uploaded_file is None:
     st.warning("Bitte lade eine CSV-Datei hoch.")
     st.stop()
@@ -23,7 +23,7 @@ except Exception as e:
     st.error(f"❌ Fehler beim Einlesen der Datei: {e}")
     st.stop()
 
-st.write("🧾 Gefundene Spalten:", df.columns.tolist())
+st.write("\U0001F9FE Gefundene Spalten:", df.columns.tolist())
 
 # --- Zielgrößen aus numerischen Spalten dynamisch auswählen ---
 numerische_spalten = df.select_dtypes(include=[np.number]).columns.tolist()
@@ -33,7 +33,7 @@ if not numerische_spalten:
     st.stop()
 
 zielspalten = st.multiselect(
-    "🎯 Zielgrößen auswählen (numerische Spalten)",
+    "\U0001F3AF Zielgrößen auswählen (numerische Spalten)",
     options=numerische_spalten,
     default=[numerische_spalten[0]]
 )
@@ -70,7 +70,7 @@ modell = MultiOutputRegressor(RandomForestRegressor(n_estimators=150, random_sta
 modell.fit(X_clean, y_clean)
 
 # --- Benutzer-Eingabeformular ---
-st.sidebar.header("🔧 Parameter anpassen")
+st.sidebar.header("\U0001F527 Parameter anpassen")
 user_input = {}
 
 for col in numerisch:
@@ -98,149 +98,86 @@ input_encoded = input_encoded[X_clean.columns]
 # --- Vorhersage ---
 prediction = modell.predict(input_encoded)[0]
 
-st.subheader("🔮 Vorhergesagte Zielgrößen")
+st.subheader("\U0001F52E Vorhergesagte Zielgrößen")
 for i, ziel in enumerate(zielspalten):
     st.metric(label=ziel, value=round(prediction[i], 2))
 
-# --- Partial Dependence Plot ---
-st.subheader("📊 Einflussanalyse (Partial Dependence)")
-
-feature_options = X_clean.columns.tolist()
-selected_features = st.multiselect("📌 Einflussgrößen auswählen (max. 2)", feature_options, default=[feature_options[0]])
-
-if len(selected_features) > 2:
-    st.warning("Bitte wähle maximal 2 Einflussgrößen aus.")
-    selected_features = selected_features[:2]
-
-selected_targets = st.multiselect("📈 Zielgrößen für Analyse", zielspalten, default=zielspalten[:1])
-
-if selected_features and selected_targets:
-    for ziel in selected_targets:
-        try:
-            target_index = zielspalten.index(ziel)
-            fig, ax = plt.subplots(figsize=(6, 4) if len(selected_features) == 1 else (6, 6))
-            PartialDependenceDisplay.from_estimator(
-                modell, X_clean, selected_features, target=target_index, ax=ax
-            )
-            st.pyplot(fig)
-        except Exception as e:
-            st.warning(f"⚠️ PDP für {ziel} konnte nicht erstellt werden: {e}")
-
-# --- Regelmodul: Einfluss-Komponenten analysieren ---
-st.subheader("💬 Regelbasierte Analyse per Auswahl")
-
-regel_basis = {
-    ("sylysia256", "glanz20"): "📌 Mehr Sylysia256 → tendenziell geringerer Glanz.",
-    ("lackslurry", "kostengesamtkg"): "📌 Höherer Lackslurry-Anteil → höhere Kosten.",
-    ("acrysolrm2020e", "brookfield"): "📌 AcrysolRM2020E erhöht tendenziell die Brookfield-Viskosität.",
-    ("byk1770", "viskositätlowshear"): "📌 BYK1770 beeinflusst die Viskosität je nach Anteil."
-}
-
-komponenten_dropdown = st.selectbox("🧱 Komponente wählen", sorted([c.lower() for c in X.columns]))
-ziel_dropdown = st.selectbox("🎯 Zielgröße wählen", sorted([z.lower() for z in zielspalten]))
-
-regel_key = (komponenten_dropdown, ziel_dropdown)
-antwort = regel_basis.get(regel_key)
-
-if antwort:
-    st.success(antwort)
-else:
-    st.info("❓ Für diese Kombination ist noch keine Regel hinterlegt.")
-
-# --- Was-wäre-wenn Analyse ---
-st.subheader("🔁 Was wäre wenn du eine Komponente änderst?")
-was_waere_feature = st.selectbox("🔄 Komponente auswählen", numerisch)
-
-input_varianten = pd.DataFrame([
-    {**user_input, was_waere_feature: df[was_waere_feature].min()},
-    {**user_input, was_waere_feature: df[was_waere_feature].mean()},
-    {**user_input, was_waere_feature: df[was_waere_feature].max()},
-])
-
-encoded_varianten = pd.get_dummies(input_varianten)
-for col in X_clean.columns:
-    if col not in encoded_varianten.columns:
-        encoded_varianten[col] = 0
-encoded_varianten = encoded_varianten[X_clean.columns]
-
-vorhersagen = modell.predict(encoded_varianten)
-
-st.markdown(f"📊 Vergleich für **{was_waere_feature}**:")
-was_labels = ["Minimum", "Mittelwert", "Maximum"]
-
-for i, ziel in enumerate(zielspalten):
-    st.write(f"**{ziel}:**")
-    st.write({
-        was_labels[j]: round(vorhersagen[j][i], 2)
-        for j in range(3)
-    })
-
-# --- Download der Vorhersage ---
-st.subheader("📤 Vorhersage exportieren")
-
-vorhersage_df = pd.DataFrame([prediction], columns=zielspalten)
-csv_download = vorhersage_df.to_csv(index=False).encode("utf-8")
-
-st.download_button(
-    label="📥 Download als CSV",
-    data=csv_download,
-    file_name="vorhersage.csv",
-    mime="text/csv"
-)
-
 # --- Zieloptimierung per Zufallssuche ---
-st.subheader("🎯 Zieloptimierung: Welche Formulierung erfüllt deine Vorgaben?")
+st.subheader("\U0001F3AF Zieloptimierung: Welche Formulierung erfüllt deine Vorgaben?")
 
-with st.expander("⚙️ Zielwerte definieren"):
-    ziel_glanz20 = st.number_input("🔆 Glanz20 (±2)", value=30.0)
-    ziel_glanz60 = st.number_input("🌟 Glanz60 (±2)", value=60.0)
-    ziel_glanz85 = st.number_input("💡 Glanz85 (±2)", value=80.0)
-    ziel_kratzschutz = st.number_input("🛡️ Kratzschutz (±1)", value=3.0)
-    max_kosten = st.number_input("💰 Maximale Kosten €/kg", value=2.0)
+if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).intersection(set(zielspalten)):
 
-steuerbare_rohstoffe = [
-    "Lackslurry", "Wasser", "Byk1770", "Albawhite70", "Omycarb2JSV",
-    "Sylysia256", "AcrysolRM2020E", "MowilithLDM7416",
-    "AlbedingkAC2003", "Byk1785", "AcrysolRM8WE"
-]
+    with st.expander("⚙️ Zielwerte definieren"):
+        if "Glanz20" in zielspalten:
+            ziel_glanz20 = st.number_input("\U0001F506 Glanz20 (±2)", value=30.0)
+        if "Glanz60" in zielspalten:
+            ziel_glanz60 = st.number_input("\U0001F31F Glanz60 (±2)", value=60.0)
+        if "Glanz85" in zielspalten:
+            ziel_glanz85 = st.number_input("\U0001F4A1 Glanz85 (±2)", value=80.0)
+        if "Kratzschutz" in zielspalten:
+            ziel_kratzschutz = st.number_input("\U0001F6E1️ Kratzschutz (±1)", value=3.0)
+        if "KostenGesamtkg" in zielspalten:
+            max_kosten = st.number_input("\U0001F4B0 Maximale Kosten €/kg", value=2.0)
 
-anzahl_varianten = 1000
-simulierte_formulierungen = []
-
-if st.button("🚀 Starte Zielsuche"):
-
-    for _ in range(anzahl_varianten):
-        zufall = {roh: np.random.uniform(df[roh].min(), df[roh].max()) for roh in steuerbare_rohstoffe}
-        simulierte_formulierungen.append(zufall)
-
-    sim_df = pd.DataFrame(simulierte_formulierungen)
-
-    sim_encoded = pd.get_dummies(sim_df)
-    for col in X_clean.columns:
-        if col not in sim_encoded.columns:
-            sim_encoded[col] = 0
-    sim_encoded = sim_encoded[X_clean.columns]
-
-    y_pred = modell.predict(sim_encoded)
-
-    treffer_idx = [
-        i for i, y in enumerate(y_pred)
-        if abs(y[zielspalten.index("Glanz20")] - ziel_glanz20) <= 2
-        and abs(y[zielspalten.index("Glanz60")] - ziel_glanz60) <= 2
-        and abs(y[zielspalten.index("Glanz85")] - ziel_glanz85) <= 2
-        and abs(y[zielspalten.index("Kratzschutz")] - ziel_kratzschutz) <= 1
-        and y[zielspalten.index("KostenGesamtkg")] <= max_kosten
+    steuerbare_rohstoffe = [
+        "Lackslurry", "Wasser", "Byk1770", "Albawhite70", "Omycarb2JSV",
+        "Sylysia256", "AcrysolRM2020E", "MowilithLDM7416",
+        "AlbedingkAC2003", "Byk1785", "AcrysolRM8WE"
     ]
 
-    if treffer_idx:
-        treffer_df = sim_df.iloc[treffer_idx].copy()
-        vorhersagen_df = pd.DataFrame(y_pred[treffer_idx], columns=zielspalten)
-        ergebnis_df = pd.concat([treffer_df.reset_index(drop=True), vorhersagen_df.reset_index(drop=True)], axis=1)
+    anzahl_varianten = 1000
+    simulierte_formulierungen = []
 
-        st.success(f"✅ {len(ergebnis_df)} passende Formulierungen gefunden!")
-        st.dataframe(ergebnis_df)
+    if st.button("\U0001F680 Starte Zielsuche"):
+        for _ in range(anzahl_varianten):
+            zufall = {
+                roh: np.random.uniform(df[roh].min(), df[roh].max())
+                for roh in steuerbare_rohstoffe if roh in df.columns
+            }
+            simulierte_formulierungen.append(zufall)
 
-        csv = ergebnis_df.to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Ergebnisse als CSV herunterladen", data=csv, file_name="passende_formulierungen.csv")
-    else:
-        st.error("❌ Keine passenden Formulierungen gefunden. Probiere mehr Toleranz oder lockere Kriterien.")
+        sim_df = pd.DataFrame(simulierte_formulierungen)
+
+        sim_encoded = pd.get_dummies(sim_df)
+        for col in X_clean.columns:
+            if col not in sim_encoded.columns:
+                sim_encoded[col] = 0
+        sim_encoded = sim_encoded[X_clean.columns]
+
+        y_pred = modell.predict(sim_encoded)
+
+        treffer_idx = []
+        for i, y in enumerate(y_pred):
+            passt = True
+            if "KostenGesamtkg" in zielspalten and y[zielspalten.index("KostenGesamtkg")] > max_kosten:
+                passt = False
+            if "Glanz20" in zielspalten and abs(y[zielspalten.index("Glanz20")] - ziel_glanz20) > 2:
+                passt = False
+            if "Glanz60" in zielspalten and abs(y[zielspalten.index("Glanz60")] - ziel_glanz60) > 2:
+                passt = False
+            if "Glanz85" in zielspalten and abs(y[zielspalten.index("Glanz85")] - ziel_glanz85) > 2:
+                passt = False
+            if "Kratzschutz" in zielspalten and abs(y[zielspalten.index("Kratzschutz")] - ziel_kratzschutz) > 1:
+                passt = False
+            if passt:
+                treffer_idx.append(i)
+
+        if treffer_idx:
+            treffer_df = sim_df.iloc[treffer_idx].copy()
+            vorhersagen_df = pd.DataFrame(
+                [y_pred[i] for i in treffer_idx],
+                columns=zielspalten
+            )
+            ergebnis_df = pd.concat(
+                [treffer_df.reset_index(drop=True), vorhersagen_df.reset_index(drop=True)],
+                axis=1
+            )
+            st.success(f"✅ {len(ergebnis_df)} passende Formulierungen gefunden!")
+            st.dataframe(ergebnis_df)
+
+            csv = ergebnis_df.to_csv(index=False).encode("utf-8")
+            st.download_button("\U0001F4C5 Ergebnisse als CSV herunterladen", data=csv, file_name="passende_formulierungen.csv")
+        else:
+            st.error("❌ Keine passenden Formulierungen gefunden. Probiere mehr Toleranz oder andere Zielwerte.")
+else:
+    st.info("ℹ️ Um die Zielsuche zu aktivieren, wähle mindestens eine dieser Zielgrößen aus: Glanz20, Glanz60, Glanz85, Kratzschutz oder KostenGesamtkg.")
