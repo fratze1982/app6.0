@@ -125,15 +125,27 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
         "AlbedingkAC2003", "Byk1785", "AcrysolRM8WE"
     ]
 
+    st.sidebar.header("\U0001F6E0️ Rohstoffe für Zielsuche fixieren")
+    fixierte_werte = {}
+    for roh in steuerbare_rohstoffe:
+        if roh in df.columns:
+            fixieren = st.sidebar.checkbox(f"{roh} fixieren?")
+            if fixieren:
+                fix_wert = st.sidebar.number_input(f"{roh} Wert", value=float(df[roh].mean()))
+                fixierte_werte[roh] = fix_wert
+
     anzahl_varianten = 1000
     simulierte_formulierungen = []
 
     if st.button("\U0001F680 Starte Zielsuche"):
         for _ in range(anzahl_varianten):
-            zufall = {
-                roh: np.random.uniform(df[roh].min(), df[roh].max())
-                for roh in steuerbare_rohstoffe if roh in df.columns
-            }
+            zufall = {}
+            for roh in steuerbare_rohstoffe:
+                if roh in df.columns:
+                    if roh in fixierte_werte:
+                        zufall[roh] = fixierte_werte[roh]
+                    else:
+                        zufall[roh] = np.random.uniform(df[roh].min(), df[roh].max())
             simulierte_formulierungen.append(zufall)
 
         sim_df = pd.DataFrame(simulierte_formulierungen)
