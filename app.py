@@ -5,6 +5,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.inspection import PartialDependenceDisplay
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 st.set_page_config(page_title="KI-Vorhersage für Lackrezepturen", layout="wide")
 st.title("\U0001F3A8 KI-Vorhersage für Lackrezepturen")
@@ -107,17 +108,15 @@ st.subheader("\U0001F3AF Zieloptimierung: Welche Formulierung erfüllt deine Vor
 
 if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).intersection(set(zielspalten)):
 
-    with st.expander("⚙️ Zielwerte definieren"):
-        if "Glanz20" in zielspalten:
-            ziel_glanz20 = st.number_input("\U0001F506 Glanz20 (±2)", value=30.0)
-        if "Glanz60" in zielspalten:
-            ziel_glanz60 = st.number_input("\U0001F31F Glanz60 (±2)", value=60.0)
-        if "Glanz85" in zielspalten:
-            ziel_glanz85 = st.number_input("\U0001F4A1 Glanz85 (±2)", value=80.0)
-        if "Kratzschutz" in zielspalten:
-            ziel_kratzschutz = st.number_input("\U0001F6E1️ Kratzschutz (±1)", value=3.0)
-        if "KostenGesamtkg" in zielspalten:
-            max_kosten = st.number_input("\U0001F4B0 Maximale Kosten €/kg", value=2.0)
+    with st.expander("⚙️ Zielwerte, Toleranzen & Gewichtung definieren"):
+        zielwerte = {}
+        toleranzen = {}
+        gewichtung = {}
+
+        for ziel in zielspalten:
+            zielwerte[ziel] = st.number_input(f"Zielwert für {ziel}", value=float(df[ziel].mean()))
+            toleranzen[ziel] = st.number_input(f"Toleranz für {ziel} (±)", value=2.0 if "Glanz" in ziel else 1.0)
+            gewichtung[ziel] = st.slider(f"Gewichtung für {ziel}", min_value=0.0, max_value=5.0, value=1.0, step=0.1)
 
     steuerbare_rohstoffe = [
         "Lackslurry", "Wasser", "Byk1770", "Albawhite70", "Omycarb2JSV",
@@ -125,17 +124,24 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
         "AlbedingkAC2003", "Byk1785", "AcrysolRM8WE"
     ]
 
-    st.sidebar.header("\U0001F6E0️ Rohstoffe für Zielsuche fixieren")
+    st.sidebar.header("\U0001F6E0️ Rohstoffe für Zielsuche fixieren und begrenzen")
     fixierte_werte = {}
+    rohstoffgrenzen = {}
+
     for roh in steuerbare_rohstoffe:
         if roh in df.columns:
             fixieren = st.sidebar.checkbox(f"{roh} fixieren?")
             if fixieren:
                 fix_wert = st.sidebar.number_input(f"{roh} Wert", value=float(df[roh].mean()))
                 fixierte_werte[roh] = fix_wert
+            else:
+                min_val = float(df[roh].min())
+                max_val = float(df[roh].max())
+                rohstoffgrenzen[roh] = st.sidebar.slider(f"Grenzen für {roh}", min_val, max_val, (min_val, max_val))
 
     anzahl_varianten = 1000
     simulierte_formulierungen = []
+    score_liste = []
 
     if st.button("\U0001F680 Starte Zielsuche"):
         for _ in range(anzahl_varianten):
@@ -145,7 +151,8 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
                     if roh in fixierte_werte:
                         zufall[roh] = fixierte_werte[roh]
                     else:
-                        zufall[roh] = np.random.uniform(df[roh].min(), df[roh].max())
+                        min_bereich, max_bereich = rohstoffgrenzen[roh]
+                        zufall[roh] = np.random.uniform(min_bereich, max_bereich)
             simulierte_formulierungen.append(zufall)
 
         sim_df = pd.DataFrame(simulierte_formulierungen)
@@ -160,45 +167,51 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
 
         treffer_idx = []
         for i, y in enumerate(y_pred):
+            score = 0
             passt = True
-            if "KostenGesamtkg" in zielspalten and y[zielspalten.index("KostenGesamtkg")] > max_kosten:
-                passt = False
-            if "Glanz20" in zielspalten and abs(y[zielspalten.index("Glanz20")] - ziel_glanz20) > 2:
-                passt = False
-            if "Glanz60" in zielspalten and abs(y[zielspalten.index("Glanz60")] - ziel_glanz60) > 2:
-                passt = False
-            if "Glanz85" in zielspalten and abs(y[zielspalten.index("Glanz85")] - ziel_glanz85) > 2:
-                passt = False
-            if "Kratzschutz" in zielspalten and abs(y[zielspalten.index("Kratzschutz")] - ziel_kratzschutz) > 1:
-                passt = False
+            for ziel in zielspalten:
+                delta = abs(y[zielspalten.index(ziel)] - zielwerte[ziel])
+                score += delta * gewichtung[ziel]
+                if delta > toleranzen[ziel]:
+                    passt = False
             if passt:
-                treffer_idx.append(i)
+                score_liste.append((i, score))
 
-        if treffer_idx:
+        if score_liste:
+            score_liste.sort(key=lambda x: x[1])
+            treffer_idx = [i for i, s in score_liste]
+
             treffer_df = sim_df.iloc[treffer_idx].copy()
             vorhersagen_df = pd.DataFrame(
                 [y_pred[i] for i in treffer_idx],
                 columns=zielspalten
             )
 
-            zielspalten_umbenannt = []
-            for ziel in vorhersagen_df.columns:
-                if ziel in treffer_df.columns:
-                    new_name = ziel + "_vorhersage"
-                    vorhersagen_df.rename(columns={ziel: new_name}, inplace=True)
-                    zielspalten_umbenannt.append(new_name)
-                else:
-                    zielspalten_umbenannt.append(ziel)
-
             ergebnis_df = pd.concat(
                 [treffer_df.reset_index(drop=True), vorhersagen_df.reset_index(drop=True)],
                 axis=1
             )
+            ergebnis_df.insert(0, "Score", [round(s, 2) for _, s in score_liste])
+
             st.success(f"✅ {len(ergebnis_df)} passende Formulierungen gefunden!")
             st.dataframe(ergebnis_df)
 
+            # --- Download ---
             csv = ergebnis_df.to_csv(index=False).encode("utf-8")
             st.download_button("\U0001F4C5 Ergebnisse als CSV herunterladen", data=csv, file_name="passende_formulierungen.csv")
+
+            # --- Diagramm: Zielwerte ---
+            st.subheader("\U0001F4CA Diagramm: Zielgrößen der Top 10 Formulierungen")
+            if len(ergebnis_df) > 0:
+                top10 = ergebnis_df.head(10).copy()
+                fig, ax = plt.subplots(figsize=(10, 5))
+                for ziel in zielspalten:
+                    ax.plot(top10["Score"], top10[ziel], label=ziel, marker="o")
+                ax.set_xlabel("Score (niedriger = besser)")
+                ax.set_ylabel("Zielwert")
+                ax.set_title("Zielgrößen im Vergleich (Top 10)")
+                ax.legend()
+                st.pyplot(fig)
         else:
             st.error("❌ Keine passenden Formulierungen gefunden. Probiere mehr Toleranz oder andere Zielwerte.")
 else:
