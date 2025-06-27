@@ -168,6 +168,16 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
                 [y_pred[i] for i in treffer_idx],
                 columns=zielspalten
             )
+
+            zielspalten_umbenannt = []
+            for ziel in vorhersagen_df.columns:
+                if ziel in treffer_df.columns:
+                    new_name = ziel + "_vorhersage"
+                    vorhersagen_df.rename(columns={ziel: new_name}, inplace=True)
+                    zielspalten_umbenannt.append(new_name)
+                else:
+                    zielspalten_umbenannt.append(ziel)
+
             ergebnis_df = pd.concat(
                 [treffer_df.reset_index(drop=True), vorhersagen_df.reset_index(drop=True)],
                 axis=1
