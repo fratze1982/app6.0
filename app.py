@@ -215,7 +215,26 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
                 ax.set_title("Zielgrößen im Vergleich (Top 10)")
                 ax.legend()
                 st.pyplot(fig)
-        else:
-            st.error("❌ Keine passenden Formulierungen gefunden. Probiere mehr Toleranz oder andere Zielwerte.")
+
+            # --- Radar-Diagramm ---
+            st.subheader("\U0001F52C Radar-Diagramm der Top 3")
+            if len(ergebnis_df) >= 3:
+                radar_data = ergebnis_df.head(3)[zielspalten].copy()
+                labels = list(zielspalten)
+                num_vars = len(labels)
+                angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+                labels += labels[:1]
+
+                fig, ax = plt.subplots(subplot_kw=dict(polar=True))
+                for idx, row in radar_data.iterrows():
+                    values = row.tolist()
+                    values += values[:1]
+                    ax.plot(angles, values, label=f"Formulierung {idx+1}")
+                    ax.fill(angles, values, alpha=0.1)
+                ax.set_thetagrids(np.degrees(angles), labels)
+                ax.set_title("Radarvergleich Zielgrößen")
+                ax.legend(loc="upper right")
+                st.pyplot(fig)
+
 else:
     st.info("ℹ️ Um die Zielsuche zu aktivieren, wähle mindestens eine dieser Zielgrößen aus: Glanz20, Glanz60, Glanz85, Kratzschutz oder KostenGesamtkg.")
