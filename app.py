@@ -137,6 +137,9 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
             else:
                 min_val = float(df[roh].min())
                 max_val = float(df[roh].max())
+                if min_val == max_val:
+                    min_val -= 0.01
+                    max_val += 0.01
                 rohstoffgrenzen[roh] = st.sidebar.slider(f"Grenzen für {roh}", min_val, max_val, (min_val, max_val))
 
     anzahl_varianten = 1000
