@@ -223,6 +223,7 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
                 labels = list(zielspalten)
                 num_vars = len(labels)
                 angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+                angles += angles[:1]
                 labels += labels[:1]
 
                 fig, ax = plt.subplots(subplot_kw=dict(polar=True))
