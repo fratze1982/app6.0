@@ -217,7 +217,8 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
                 st.pyplot(fig)
 
             # --- Radar-Diagramm ---
-            st.subheader("🔬 Radar-Diagramm der Top 3")
+            if 'ergebnis_df' in locals():
+    st.subheader("🔬 Radar-Diagramm der Top 3")
 if len(ergebnis_df) >= 3:
     radar_data = ergebnis_df.head(3)[zielspalten].copy()
     labels = list(zielspalten)
