@@ -217,25 +217,46 @@ if set(["KostenGesamtkg", "Glanz20", "Glanz60", "Glanz85", "Kratzschutz"]).inter
                 st.pyplot(fig)
 
             # --- Radar-Diagramm ---
-            st.subheader("\U0001F52C Radar-Diagramm der Top 3")
-            if len(ergebnis_df) >= 3:
-                radar_data = ergebnis_df.head(3)[zielspalten].copy()
-                labels = list(zielspalten)
-                num_vars = len(labels)
-                angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-                angles += angles[:1]
-                labels += labels[:1]
+            st.subheader("🔬 Radar-Diagramm der Top 3")
+if len(ergebnis_df) >= 3:
+    radar_data = ergebnis_df.head(3)[zielspalten].copy()
+    labels = list(zielspalten)
+    num_vars = len(labels)
+    angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+    angles += angles[:1]
+    labels += labels[:1]
 
-                fig, ax = plt.subplots(subplot_kw=dict(polar=True))
-                for idx, row in radar_data.iterrows():
-                    values = row.tolist()
-                    values += values[:1]
-                    ax.plot(angles, values, label=f"Formulierung {idx+1}")
-                    ax.fill(angles, values, alpha=0.1)
-                ax.set_thetagrids(np.degrees(angles), labels)
-                ax.set_title("Radarvergleich Zielgrößen")
-                ax.legend(loc="upper right")
-                st.pyplot(fig)
+    fig, ax = plt.subplots(subplot_kw=dict(polar=True))
+    for idx, row in radar_data.iterrows():
+        values = row.tolist()
+        values += values[:1]
+        ax.plot(angles, values, label=f"Formulierung {idx+1}")
+        ax.fill(angles, values, alpha=0.1)
+    ax.set_thetagrids(np.degrees(angles), labels)
+    ax.set_title("Radarvergleich Zielgrößen")
+    ax.legend(loc="upper right")
+    st.pyplot(fig)
+
+# --- Interaktive Auswahl und Balkendiagramm ---
+st.subheader("📊 Vergleich ausgewählter Formulierungen als Balkendiagramm")
+max_auswahl = min(len(ergebnis_df), 10)
+index_auswahl = st.multiselect(
+    "Wähle bis zu 5 Formulierungen zum Vergleich:",
+    options=list(range(len(ergebnis_df))),
+    default=list(range(min(3, len(ergebnis_df)))),
+    help="Die Auswahl basiert auf den Zeilenpositionen aus der Tabelle."
+)
+
+if index_auswahl:
+    vergleich_df = ergebnis_df.loc[index_auswahl, zielspalten].copy()
+    vergleich_df["Formulierung"] = [f"F{i+1}" for i in index_auswahl]
+    vergleich_df = vergleich_df.set_index("Formulierung")
+    fig_bar, ax_bar = plt.subplots(figsize=(10, 6))
+    vergleich_df.plot(kind="bar", ax=ax_bar)
+    ax_bar.set_ylabel("Wert")
+    ax_bar.set_title("Zielgrößen-Vergleich ausgewählter Formulierungen")
+    ax_bar.legend(title="Zielgröße")
+    st.pyplot(fig_bar)
 
 else:
     st.info("ℹ️ Um die Zielsuche zu aktivieren, wähle mindestens eine dieser Zielgrößen aus: Glanz20, Glanz60, Glanz85, Kratzschutz oder KostenGesamtkg.")
